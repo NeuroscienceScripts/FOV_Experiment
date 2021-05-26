@@ -1,4 +1,4 @@
-﻿Shader "DisplayLightsShader"
+﻿Shader "DisplayCrosshairShader"
 {
     Properties
     {
@@ -48,7 +48,7 @@
 
             fixed4 frag (v2f i) : SV_Target
             {
-                float pixelSize = .02; 
+                float pixelSize = .005; 
                
                 fixed4 col = tex2D(_MainTex, i.uv);
                 
@@ -62,10 +62,10 @@
                  }
                  else
                  {
-                    if((i.uv.x < (xValue +(pixelSize/aspectRatio))) && (i.uv.x > (xValue -(pixelSize/aspectRatio))) && (i.uv.y < (yValue +pixelSize)) && (i.uv.y > (yValue -pixelSize))
-                        || (i.uv.x < (xValue +(pixelSize/1.5/aspectRatio))) && (i.uv.x > (xValue -(pixelSize/1.5/aspectRatio))) && (i.uv.y < (yValue +1.5*pixelSize)) && (i.uv.y > (yValue - 1.5*pixelSize))
-                        || (i.uv.x < (xValue +(1.5*pixelSize/aspectRatio))) && (i.uv.x > (xValue -(1.5*pixelSize/aspectRatio))) && (i.uv.y < (yValue +pixelSize/1.5)) && (i.uv.y > (yValue - pixelSize/1.5)))
-                            return fixed4(1, 1, 1, 1);
+                    // if((i.uv.x < (xValue +(pixelSize/aspectRatio))) && (i.uv.x > (xValue -(pixelSize/aspectRatio))) && (i.uv.y < (yValue +pixelSize)) && (i.uv.y > (yValue -pixelSize))
+                    //     || (i.uv.x < (xValue +(pixelSize/1.5/aspectRatio))) && (i.uv.x > (xValue -(pixelSize/1.5/aspectRatio))) && (i.uv.y < (yValue +1.5*pixelSize)) && (i.uv.y > (yValue - 1.5*pixelSize))
+                    //     || (i.uv.x < (xValue +(1.5*pixelSize/aspectRatio))) && (i.uv.x > (xValue -(1.5*pixelSize/aspectRatio))) && (i.uv.y < (yValue +pixelSize/1.5)) && (i.uv.y > (yValue - pixelSize/1.5)))
+                    //         return fixed4(1, 1, 1, 1);
                         
                     if((i.uv.x < (.5 + .05/aspectRatio)) && (i.uv.x > (.5 - .05/aspectRatio)) && (i.uv.y < (.5 + .005)) && (i.uv.y > (.5 - .005))
                         || (i.uv.x < (.5 + .005/aspectRatio)) && (i.uv.x > (.5 - .005/aspectRatio)) && (i.uv.y < (.5 + .05)) && (i.uv.y > (.5 - .05)))

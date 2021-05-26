@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using DefaultNamespace;
 using UnityEditor.VersionControl;
 using UnityEngine;
@@ -12,15 +15,19 @@ public class RunShader : MonoBehaviour
     public monocularSettings monocularSettings; 
     public Material setLinesMaterial;
     public Material displayLightsMaterial;
-    public Material blindSpotMaterial; 
+    public Material blindSpotMaterial;
+    public Material crosshairMaterial; 
     public Camera mainCam; 
 
     public GameObject lineInstructions;
     public GameObject perimeterInstructions;
+    public GameObject blindspotInstructions;
 
     private bool runAll; 
     private bool linesSet;
-    private bool blindspotSet; 
+    private bool blindspotSet;
+
+    private bool displayInstructions = true; 
     private bool hasStarted;
     private float timeTracker;
 
@@ -40,7 +47,11 @@ public class RunShader : MonoBehaviour
     private int[] trialResponseArray;
     private int trialNumber;
     private int pause=0;
-    private string subjectFile; 
+    private string subjectFile;
+    private FileHandler fileHandler = new FileHandler(); 
+    
+    public AudioSource beepSound;
+    private double speedUpFactor = 1.0; 
 
     private void Start()
     {
@@ -48,9 +59,7 @@ public class RunShader : MonoBehaviour
         displayLightsMaterial.SetInt("debugMode", 0);
         
         Debug.Log(mainCam.fieldOfView);
-        subjectFile = Application.dataPath + Path.DirectorySeparatorChar +"Data" + Path.DirectorySeparatorChar
-                      + "Experiment_Data" + DateTime.Now.Date.ToShortDateString() + DateTime.Now.Date.ToShortTimeString();
-
+       
         if (monocularSettings == monocularSettings.All)
         {
             runAll = true;
@@ -60,8 +69,12 @@ public class RunShader : MonoBehaviour
         else if (monocularSettings == monocularSettings.Both)
             yRange = .25f;
         else if (monocularSettings == monocularSettings.Right)
-            xRange = .75f; 
-        
+            xRange = .75f;
+
+        subjectFile = DateTime.Today.ToShortDateString() + DateTime.Now.Millisecond.ToString();
+        subjectFile = Application.dataPath + Path.DirectorySeparatorChar + "data" + Path.DirectorySeparatorChar + subjectFile.Replace('/', '_'); 
+        Debug.Log(subjectFile); 
+
     }
     
     /// <summary>
@@ -126,9 +139,16 @@ public class RunShader : MonoBehaviour
                 xyList[count] = new Vector4(blindspotX, blindspotY, 2f, 0);
                 count++; 
             }
-
-            //TODO randomize order
+            
             trialResponseArray = new int[xyList.Length];
+            for (int t = 0; t < xyList.Length; t++ )
+            {
+                Vector4 tmp = xyList[t];
+                int r = UnityEngine.Random.Range(t, xyList.Length);
+                xyList[t] = xyList[r];
+                xyList[r] = tmp;
+
+            }
         }
     }
 
@@ -148,46 +168,65 @@ public class RunShader : MonoBehaviour
         
        if ( !blindspotSet && (monocularSettings == monocularSettings.Left || monocularSettings == monocularSettings.Right))
        {
-           Debug.Log("Setting blindspot"); 
-           blindSpotMaterial.SetFloat("aspectRatio", (float)source.width/(float)source.height);
-            Debug.Log(xRange + "," + yRange);
-            if (Input.GetKey("up"))
-                yRange += .001f;
+           if (displayInstructions)
+           {
+               blindspotInstructions.SetActive(true);
+               if (Input.GetKey("space"))
+               {
+                   displayInstructions = false;
+               }
+               Graphics.Blit(source, destination);
+           }
+           else
+           {
+               //Debug.Log("Setting blindspot");
+               blindSpotMaterial.SetFloat("aspectRatio", (float) source.width / (float) source.height);
+               //Debug.Log(xRange + "," + yRange);
+               if (Input.GetKey("up"))
+                   yRange += .001f;
 
-            if (Input.GetKey("down"))
-                yRange += -.001f;
+               if (Input.GetKey("down"))
+                   yRange += -.001f;
 
-            if (Input.GetKey("right"))
-                xRange += .001f;
+               if (Input.GetKey("right"))
+                   xRange += .001f;
 
-            if (Input.GetKey("left"))
-                xRange += -.001f;
+               if (Input.GetKey("left"))
+                   xRange += -.001f;
 
-            if (Input.GetKey("space"))
-            {
-                blindspotSet = true;
-                lineInstructions.SetActive(true); 
-                //perimeterInstructions.SetActive(true);
+               if (Input.GetKey("space") && timeTracker > .5)
+               {
+                   
+                   blindspotSet = true;
+                   blindspotInstructions.SetActive(false);
+                   lineInstructions.SetActive(true);
 
-                xRange = .1f;
-                yRange = .1f; 
-            }
-            else
-            {
-                blindSpotMaterial.SetFloat("xValue", xRange);
-                blindSpotMaterial.SetFloat("yValue", yRange);
+                   fileHandler.AppendLine(subjectFile, monocularSettings.ToString() + " Blindspot: " + xRange + "," + yRange); 
 
-                Graphics.Blit(source, destination, blindSpotMaterial);
-            }
-            
+                   xRange = .1f;
+                   yRange = .1f;
+
+                   timeTracker = 0; 
+               }
+               else
+               {
+                   blindSpotMaterial.SetFloat("xValue", xRange);
+                   blindSpotMaterial.SetFloat("yValue", yRange);
+
+                   Graphics.Blit(source, destination, blindSpotMaterial);
+                   timeTracker += Time.deltaTime; 
+               }
+           }
+
        }
        else if (!linesSet)
        {
            if (timeTracker > .5)
            {
-               Debug.Log("Setting FOV start");
+               //Debug.Log("Setting FOV start");
                displayLightsMaterial.SetFloat("aspectRatio", (float) source.width / (float) source.height);
-
+               crosshairMaterial.SetFloat("aspectRatio", (float) source.width / (float) source.height);
+               
                if (Input.GetKey("up"))
                    yRange += .001f;
 
@@ -203,9 +242,12 @@ public class RunShader : MonoBehaviour
                if (Input.GetKey("space"))
                {
                    linesSet = true;
-                  // setList();
+                   lineInstructions.SetActive(false);
                    perimeterInstructions.SetActive(true);
-                   timeTracker = 0.0f; 
+                   timeTracker = 0.0f;
+                   fileHandler.AppendLine(subjectFile, monocularSettings.ToString() + " FOV Start: " + xRange + "," + yRange); 
+
+                   setList(); 
                }
                else
                {
@@ -221,11 +263,12 @@ public class RunShader : MonoBehaviour
        {
             if (!hasStarted)
             {
-                Debug.Log("Waiting for spacebar to start"); 
+                //("Waiting for spacebar to start"); 
                 if (Input.GetKey("space") && timeTracker > .5)
                 {
                     hasStarted = true;
                     perimeterInstructions.SetActive(false);
+                    timeTracker = 0; 
                 }
                 else
                 {
@@ -234,7 +277,7 @@ public class RunShader : MonoBehaviour
 
                 Graphics.Blit(source, destination); 
             }
-            else
+            else if(trialNumber < xyList.Length)
             {
                 Debug.Log("loc: " + trialNumber);
                 Debug.Log("xVal: " + xyList[trialNumber].x);
@@ -242,17 +285,59 @@ public class RunShader : MonoBehaviour
                 displayLightsMaterial.SetFloat("xValue", xyList[trialNumber].x);
                 displayLightsMaterial.SetFloat("yValue", xyList[trialNumber].y);
 
-                Graphics.Blit(source, destination, displayLightsMaterial);
+                if(timeTracker > .25)
+                    Graphics.Blit(source, destination, displayLightsMaterial);
+                else
+                {
+                    Graphics.Blit(source, destination, crosshairMaterial); 
+                }
 
-                if (Input.GetKey("space") && timeTracker > .5)
-                    trialResponseArray[trialNumber] = 1; 
+                if (Input.GetKey("space") && timeTracker > (.25/speedUpFactor))
+                    trialResponseArray[trialNumber] = 1;
 
-                if (pause % 100 == 0)
+                if (timeTracker > (2/speedUpFactor))
+                {
+                    fileHandler.AppendLine(subjectFile, xyList[trialNumber].x + "," + xyList[trialNumber].y +": "+trialResponseArray[trialNumber]); 
+
                     trialNumber++;
-                pause++;
+                    timeTracker = 0; 
+                    beepSound.Play();
+                }
+
+                timeTracker += Time.deltaTime; 
+            }
+            else
+            {
+                if (runAll)
+                {
+                    if (monocularSettings == monocularSettings.Left)
+                    {
+                        monocularSettings = monocularSettings.Both;
+                        yRange = .25f;
+                        hasStarted = false;
+                        linesSet = false;
+                        lineInstructions.SetActive(true);
+                        trialNumber = 0;
+                        setList(); 
+                    }
+                    else if (monocularSettings == monocularSettings.Both)
+                    {
+                        monocularSettings = monocularSettings.Right;
+                        hasStarted = false;
+                        linesSet = false;
+                        blindspotSet = false; 
+                        xRange = .75f;
+                        yRange = .50f; 
+                        displayInstructions = true;
+                        trialNumber = 0;
+                        setList(); 
+                    }
+                    else
+                        runAll = false;
+                }
             }
        }
         
-       // if(runAll)
+       
     }
 }
